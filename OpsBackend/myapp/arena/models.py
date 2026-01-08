@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-
+import uuid
 # organization model.
 
 class Organization(models.Model):
@@ -159,3 +159,11 @@ class Subscription(models.Model):
 
     def __str__(self):
         return f"{self.organization} - {self.plan}"
+
+
+class UserInvite(models.Model):
+    email = models.EmailField()
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    token = models.UUIDField(default=uuid.uuid4, unique=True)
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
