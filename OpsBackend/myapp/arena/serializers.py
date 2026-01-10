@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import Organization
+from .models import Organization, Tag, Project, Task, Plan
 
 User = get_user_model()
 
@@ -85,3 +85,38 @@ class AcceptInviteSerializer(serializers.Serializer):
     def validate_password(self, value):
         validate_password(value)
         return value
+
+class GoogleAuthSerializer(serializers.Serializer):
+    token = serializers.CharField()
+
+
+
+class tagSerializer(serializers.Serializer):
+    class Meta:
+        model = Tag
+        fields = ['id', 'name'] 
+
+class projectSerializer(serializers.Serializer):
+    tags = tagSerializer(many=True, read_only = True)     
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        queryset = Tag.objects.all(), many=True, write_only=True, source='tags'
+    )
+
+    class Meta:
+        model = Project
+        fields= ['id', 'name', 'description', 'organization', 'created_by', 'created_at', 'tags', 'tag_ids']
+        read_only_fields = ['created_by', 'created_at']
+
+class taskSerializer(serializers.Serializer):
+
+    class Meta:
+        model = Task
+        fields = ['id', 'title', 'description', 'status', 'priority', 'deadline', 'is_completed', 'project', 'assigned_to', 'organization', 'created_at', 'updated_at']    
+        read_only_fields = ['created_at', 'updated_at']    
+
+class planSerializer(serializers.Serializer):
+
+    class Meta:
+        model = Plan  
+        fields = ['id', 'name', 'price', 'max_users', 'max_projects'] 
+

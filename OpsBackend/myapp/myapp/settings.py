@@ -154,3 +154,6 @@ SIMPLE_JWT = {
 
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+
+GOOGLE_CLIENT_ID = "562440999072-gfonr0hgd4gr9ats504n022es60fghgi.apps.googleusercontent.com"
