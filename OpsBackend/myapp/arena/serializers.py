@@ -91,32 +91,3 @@ class GoogleAuthSerializer(serializers.Serializer):
 
 
 
-class tagSerializer(serializers.Serializer):
-    class Meta:
-        model = Tag
-        fields = ['id', 'name'] 
-
-class projectSerializer(serializers.Serializer):
-    tags = tagSerializer(many=True, read_only = True)     
-    tag_ids = serializers.PrimaryKeyRelatedField(
-        queryset = Tag.objects.all(), many=True, write_only=True, source='tags'
-    )
-
-    class Meta:
-        model = Project
-        fields= ['id', 'name', 'description', 'organization', 'created_by', 'created_at', 'tags', 'tag_ids']
-        read_only_fields = ['created_by', 'created_at']
-
-class taskSerializer(serializers.Serializer):
-
-    class Meta:
-        model = Task
-        fields = ['id', 'title', 'description', 'status', 'priority', 'deadline', 'is_completed', 'project', 'assigned_to', 'organization', 'created_at', 'updated_at']    
-        read_only_fields = ['created_at', 'updated_at']    
-
-class planSerializer(serializers.Serializer):
-
-    class Meta:
-        model = Plan  
-        fields = ['id', 'name', 'price', 'max_users', 'max_projects'] 
-

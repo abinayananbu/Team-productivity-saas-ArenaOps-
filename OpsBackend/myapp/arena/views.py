@@ -54,9 +54,13 @@ class SignupView(APIView):
 
         user = serializer.save()
 
+        refresh = RefreshToken.for_user(user)
+
         return Response(
             {
                 "message": "Signup successful",
+                "access_token": str(refresh.access_token),
+                "refresh": str(refresh),
                 "user": UserSerializer(user).data
             },
             status=status.HTTP_201_CREATED
@@ -72,13 +76,17 @@ class LoginView(APIView):
 
         user = serializer.validated_data['user']
 
-        # Optional: Django session login
+        # Django session login
         login(request, user)
+        # Django token
+        refresh = RefreshToken.for_user(user)
 
         return Response(
             {
                 "message": "Login successful",
-                "user": UserSerializer(user).data
+                "user": UserSerializer(user).data,
+                "access_token": str(refresh.access_token),
+                "refresh": str(refresh)
             },
             status=status.HTTP_200_OK
         )
@@ -182,7 +190,7 @@ class GoogleLoginView(APIView):
 
         return Response(
             {
-                "access": str(refresh.access_token),
+                "access_token": str(refresh.access_token),
                 "refresh": str(refresh),
                 "user": UserSerializer(user).data
             },
