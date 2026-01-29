@@ -3,9 +3,11 @@ import LoginPage from "./pages/Login"
 import SignupPage from "./pages/Signup";
 import DashBoardPage from "./pages/Dashboard";
 import PrivateRoute from "./components/PrivateRoute";
+import { useDarkMode } from "./hooks/useDarkMode";
 
 function App() {
-
+  useDarkMode()
+  
   return (
     <BrowserRouter>
     <Routes>

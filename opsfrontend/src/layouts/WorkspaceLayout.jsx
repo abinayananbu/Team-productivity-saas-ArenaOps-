@@ -1,12 +1,18 @@
 import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
 
 export default function WorkspaceLayout({ children }) {
   return (
-    <div className="h-screen flex flex-col">
+    <div className="min-h-screen bg-gray-100 dark:bg-[#121212] text-gray-900 dark:text-gray-100 transition-colors">
       <Navbar />
-      <main className="flex-1 bg-gray-50 p-6 overflow-auto">
-        {children}
-      </main>
+
+      <div className="flex">
+        <Sidebar />
+
+        <main className="flex-1 p-6 bg-gray-100 dark:bg-[#121212]">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
