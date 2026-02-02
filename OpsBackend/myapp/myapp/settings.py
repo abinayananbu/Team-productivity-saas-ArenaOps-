@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'arena',
     'rest_framework',
     "corsheaders",
+    'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist',
     'django.contrib.admin',
     'django.contrib.auth',

@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const BASE_URL = "http://127.0.0.1:8000/api";
+
 export const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
+  baseURL: BASE_URL,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
@@ -13,20 +15,16 @@ export const api = axios.create({
 ======================= */
 api.interceptors.request.use(
   (config) => {
-    // Get token (change if you store it differently)
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("access");
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    console.log("➡️ Request:", config.method?.toUpperCase(), config.url);
+    console.log("➡️", config.method?.toUpperCase(), config.url);
     return config;
   },
-  (error) => {
-    console.error("❌ Request Error:", error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 /* =======================
@@ -37,27 +35,22 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If access token expired
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry
-    ) {
+    if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        const refresh = localStorage.getItem("refresh_token");
+        const refresh = localStorage.getItem("refresh");
 
         const res = await axios.post(
           `${BASE_URL}/auth/token/refresh/`,
           { refresh }
         );
 
-        localStorage.setItem("access_token", res.data.access);
+        localStorage.setItem("access", res.data.access);
 
         originalRequest.headers.Authorization = `Bearer ${res.data.access}`;
         return api(originalRequest);
       } catch (err) {
-        // refresh token expired
         localStorage.clear();
         window.location.href = "/";
         return Promise.reject(err);
@@ -67,6 +60,7 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
 
 
 
@@ -85,3 +79,7 @@ export const loginApi = (data) =>
     email: data.email,
     password: data.password,
   });
+
+
+export const profileApi = () =>
+  api.get("auth/me/");

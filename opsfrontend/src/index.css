@@ -1,1 +1,39 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* optional: smooth transition for theme changes */
+html {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@layer utilities {
+  /* Firefox */
+  .scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #52525b transparent;
+  }
+
+  /* Chrome / Edge / Safari */
+  .scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar::-webkit-scrollbar-thumb {
+    background-color: #52525b; /* zinc-600 */
+    border-radius: 9999px;
+  }
+
+  /* Dark mode */
+  .dark .scrollbar::-webkit-scrollbar-thumb {
+    background-color: #3f3f46; /* zinc-700 */
+  }
+
+  .dark .scrollbar {
+    scrollbar-color: #3f3f46 transparent;
+  }
+}

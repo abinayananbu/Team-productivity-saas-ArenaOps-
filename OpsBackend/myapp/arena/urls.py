@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import UserViewSet, SignupView, LoginView, InviteUserView, AcceptInviteView, GoogleLoginView
+from .views import UserViewSet, SignupView, LoginView, InviteUserView, AcceptInviteView, GoogleLoginView, MeView
 
 
 router = DefaultRouter()
@@ -14,4 +14,5 @@ urlpatterns = [
     path('auth/invite/', InviteUserView.as_view()),
     path('auth/accept-invite/<uuid:token>/', AcceptInviteView.as_view()),
     path("auth/google/", GoogleLoginView.as_view()),
+    path("auth/me/", MeView.as_view(), name="me"),
 ]

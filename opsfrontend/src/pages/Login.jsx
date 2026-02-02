@@ -26,7 +26,6 @@ export default function LoginPage() {
 
       localStorage.setItem("access", res.data.access_token);
       localStorage.setItem("refresh", res.data.refresh);
-
       navigate("/dashboard");
     } catch (err) {
       console.error(err.response?.data || err);
@@ -42,7 +41,6 @@ export default function LoginPage() {
 
       localStorage.setItem("access", res.data.access_token);
       localStorage.setItem("refresh", res.data.refresh);
-
       navigate("/dashboard");
     } catch (err) {
       console.error("Google login failed", err);
