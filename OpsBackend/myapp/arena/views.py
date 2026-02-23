@@ -11,8 +11,8 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth import login
-from .models import User, UserInvite
-from .serializers import UserSerializer, SignupSerializer, LoginSerializer, AcceptInviteSerializer, InviteUserSerializer, GoogleAuthSerializer
+from .models import User, UserInvite, Project, Task
+from .serializers import UserSerializer, SignupSerializer, LoginSerializer, AcceptInviteSerializer, InviteUserSerializer, GoogleAuthSerializer, ProjectSerializer, TaskSerializer
 from .permissions import IsOrganizationMember, ReadOnlyForMembers, IsOwnerOrAdmin
 
 
@@ -226,3 +226,80 @@ class MeView(APIView):
                 "name": user.organization.name if user.organization else None,
             }
         })
+    
+
+class ProjectView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ProjectSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {"message": "Project created successfully"},
+            status=status.HTTP_201_CREATED
+        )
+
+class ShowProject(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        projects = Project.objects.filter(
+            organization=request.user.organization
+        )
+
+        serializer = ProjectSerializer(projects, many=True)
+
+        return Response(serializer.data)
+
+class ProjectDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id):
+        project = Project.objects.filter(
+            id=id,
+            organization=request.user.organization
+        ).first()
+
+        if not project:
+            return Response(
+                {"error": "Project not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = ProjectSerializer(project)
+        return Response(serializer.data)
+
+class TaskListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        project_id = request.query_params.get("project")
+
+        tasks = Task.objects.filter(
+            organization=request.user.organization,
+            project_id=project_id
+        ).order_by("-created_at")
+
+        serializer = TaskSerializer(tasks, many=True)
+        return Response(serializer.data)
+
+class TaskCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = TaskSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {"message": "Task created successfully"},
+            status=status.HTTP_201_CREATED
+        )

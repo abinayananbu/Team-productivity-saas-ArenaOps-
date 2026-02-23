@@ -83,3 +83,23 @@ export const loginApi = (data) =>
 
 export const profileApi = () =>
   api.get("auth/me/");
+
+export const createProjectApi = (data) =>
+  api.post('auth/project/',{
+    name : data.name,
+    description: data.desc
+  });
+
+export const showProjectApi = () =>
+  api.get('auth/projects/'); 
+
+
+export const getProjectByIdApi = (id) =>
+  api.get(`/projects/${id}/`);
+
+export const getTasksApi = (projectId) =>
+  api.get(`/tasks/?project=${projectId}`);
+
+export const createTaskApi = (data) =>
+  api.post("/tasks/", data);
+

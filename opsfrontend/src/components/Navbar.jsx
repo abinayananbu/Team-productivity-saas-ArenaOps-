@@ -4,6 +4,7 @@ import { logOut } from "../services/Auth";
 import { useTheme } from "../context/ThemeContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { profileApi } from "../services/api";
+import logo from "../assets/arenaOps.png"
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -99,7 +100,7 @@ export default function Navbar() {
         border-b border-gray-200 dark:border-gray-800 relative z-50"
     >
       {/* Workspace */}
-      <div className="relative" ref={workspaceRef}>
+      <div className="relative mt-2" ref={workspaceRef}>
         <button
           onClick={() => {
             setOpen(!open);
@@ -111,7 +112,11 @@ export default function Navbar() {
             hover:bg-gray-100 dark:hover:bg-gray-800
             px-2 py-1 rounded"
         >
-          ArenaOps
+          <img
+            src={logo}
+            alt="ArenaOps Logo"
+            className="h-10 w-auto"
+          />
           <ChevronDown size={16} />
         </button>
 

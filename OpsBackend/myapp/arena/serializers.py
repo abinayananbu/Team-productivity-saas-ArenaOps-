@@ -90,6 +90,57 @@ class GoogleAuthSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
+class ProjectSerializer(serializers.ModelSerializer):
 
+    class Meta:
+        model = Project
+        fields = [
+            'id',
+            'name',
+            'description',
+            'created_at',
+            'tags'
+        ]
+        read_only_fields = ['created_at']
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+
+        return Project.objects.create(
+            organization=user.organization,
+            created_by=user,
+            **validated_data
+        )
+
+class TaskSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Task
+        fields = [
+            "id",
+            "title",
+            "description",
+            "status",
+            "project",
+            "created_at"
+        ]
+        read_only_fields = ["created_at"]
+
+    def validate_project(self, value):
+        user = self.context["request"].user
+
+        if value.organization != user.organization:
+            raise serializers.ValidationError("Invalid project")
+
+        return value
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+
+        return Task.objects.create(
+            organization=user.organization,
+            created_by=user,
+            **validated_data
+        )
 
 
