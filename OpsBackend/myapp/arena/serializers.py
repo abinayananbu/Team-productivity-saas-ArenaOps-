@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import Organization, Tag, Project, Task, Plan
+from .models import Organization, Tag, Project, Task, Plan, Message
 
 User = get_user_model()
 
@@ -15,6 +15,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Organization
         fields = ['id', 'name', 'plan', 'is_active', 'created_at']
@@ -73,11 +74,6 @@ class LoginSerializer(serializers.Serializer):
 class InviteUserSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("User already exists")
-        return value
-
 
 class AcceptInviteSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
@@ -91,6 +87,7 @@ class GoogleAuthSerializer(serializers.Serializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    task_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -98,49 +95,60 @@ class ProjectSerializer(serializers.ModelSerializer):
             'id',
             'name',
             'description',
+            'created_by',
             'created_at',
-            'tags'
+            'tags',
+            'task_count',
         ]
-        read_only_fields = ['created_at']
-
+        read_only_fields = ['created_at', 'created_by']
+        
     def create(self, validated_data):
-        user = self.context['request'].user
-
+        request = self.context['request']
+    
         return Project.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=request.user.organization,
+            created_by = request.user,
             **validated_data
         )
+    
+    def get_task_count(self, obj):
+        return obj.task_set.count()
+    
 
 class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
         fields = [
-            "id",
-            "title",
-            "description",
-            "status",
-            "project",
-            "created_at"
+            'id',
+            'title',
+            'description',
+            'status',
+            'priority',
+            'is_completed',
+            'deadline',
+            'project',
+            'assigned_to',
+            'created_at',
+            'updated_at',
         ]
-        read_only_fields = ["created_at"]
-
-    def validate_project(self, value):
-        user = self.context["request"].user
-
-        if value.organization != user.organization:
-            raise serializers.ValidationError("Invalid project")
-
-        return value
+        read_only_fields = ['created_at', 'updated_at']
 
     def create(self, validated_data):
-        user = self.context["request"].user
+        request = self.context['request']
 
         return Task.objects.create(
-            organization=user.organization,
-            created_by=user,
+            organization=request.user.organization,
             **validated_data
         )
+    
 
+# serializers.py
 
+class MessageSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ["id", "channel", "user", "user_name", "content", "created_at"]
+        read_only_fields = ["user", "created_at"]

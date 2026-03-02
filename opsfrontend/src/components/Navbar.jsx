@@ -28,7 +28,6 @@ export default function Navbar() {
     profileApi()
       .then((res) => {
         setUser(res.data);
-        console.log("Profile loaded:", res.data);
       })
       .catch(() => console.error("Failed to load profile"));
   }, []);
@@ -130,7 +129,7 @@ export default function Navbar() {
             <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
               Workspaces
             </div>
-            <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+            <button onClick={()=>navigate("/")} className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700">
               ArenaOps
             </button>
             <button  className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700">

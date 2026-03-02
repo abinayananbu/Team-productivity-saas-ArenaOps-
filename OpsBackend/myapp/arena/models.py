@@ -109,7 +109,7 @@ class Task(models.Model):
     deadline = models.DateField(null=True, blank=True)
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="created_tasks")
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -160,10 +160,31 @@ class Subscription(models.Model):
     def __str__(self):
         return f"{self.organization} - {self.plan}"
 
-
+#user invite 
 class UserInvite(models.Model):
     email = models.EmailField()
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     token = models.UUIDField(default=uuid.uuid4, unique=True)
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+# models.py
+
+class Channel(models.Model):
+    name = models.CharField(max_length=100)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Message(models.Model):
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="messages")
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]    

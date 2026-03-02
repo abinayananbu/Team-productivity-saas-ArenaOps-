@@ -1,8 +1,8 @@
-import { Plus, Folder } from "lucide-react";
+import { Plus, Folder,Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkspaceLayout from "../layouts/WorkspaceLayout";
-import { createProjectApi, showProjectApi } from "../services/api";
+import { createProjectApi, showProjectApi, deleteProjectApi } from "../services/api";
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export default function ProjectsPage() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // ✅ Fetch projects properly
+  //  Fetch projects properly
   const fetchProjects = async () => {
     try {
       const res = await showProjectApi();
@@ -26,7 +26,7 @@ export default function ProjectsPage() {
     fetchProjects();
   }, []);
 
-  // ✅ Create project properly
+  //  Create project 
   const createProject = async (e) => {
     e.preventDefault();
 
@@ -52,6 +52,17 @@ export default function ProjectsPage() {
       setLoading(false);
     }
   };
+
+  const deleteProject = async(id) =>{
+    try{
+      await deleteProjectApi(id)
+
+      await fetchProjects()
+      
+    }catch (err){
+      console.log("Can't able to delete the project", err);
+    }
+  }
 
   return (
     <WorkspaceLayout>
@@ -103,7 +114,7 @@ export default function ProjectsPage() {
               <input
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
-                placeholder="Enter project description"
+                placeholder="Enter project Detail"
                 className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 dark:bg-[#2c2d30] border border-gray-200 dark:border-gray-700"
               />
 
@@ -140,20 +151,37 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((p) => (
               <div
-                key={p.id}
-                onClick={() =>
-                  navigate(`/projectdetail/${p.id}`, { state: p })
-                }
-                className="cursor-pointer bg-white dark:bg-[#1e1f21] border border-gray-200 dark:border-gray-800 rounded-xl p-5 hover:shadow-md hover:border-indigo-500 transition"
-              >
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                  {p.name}
+              key={p.id}
+              onClick={() => navigate(`/projectdetail/${p.id}`, { state: p })}
+              className="group flex cursor-pointer bg-white dark:bg-[#1e1f21] border border-gray-200 dark:border-gray-800 rounded-xl p-5 hover:shadow-md hover:border-indigo-500 transition-all duration-200 overflow-hidden"
+            >
+              {/* Left Content */}
+              <div className="flex-1 min-w-0 pr-4">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white truncate group-hover:text-indigo-600 transition-colors">
+                  {p.name?.toUpperCase()}
                 </h3>
-
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {p.tasks?.length || 0} tasks • {p.members?.length || 0} members
+                
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-4">
+                  <span>{p.task_count || 0} tasks</span>
+                  <span>•</span>
+                  <span>{p.members?.length || 0} members</span>
                 </p>
               </div>
+
+              
+              <div className="flex items-center justify-end ml-4 flex-shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation(); 
+                    deleteProject(p.id); 
+                  }}
+                  className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                  title="Delete project"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
             ))}
           </div>
         )}

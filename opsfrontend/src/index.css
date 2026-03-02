@@ -37,3 +37,28 @@ html {
     scrollbar-color: #3f3f46 transparent;
   }
 }
+
+select option {
+  background-color: #f8fafc; /* Light gray */
+  padding: 8px 12px;
+  transition: background-color 0.2s;
+}
+
+select option:hover {
+  background-color: #e2e8f0 !important; /* Darker gray hover */
+  color: #1e293b;
+}
+
+/* Dark mode */
+.dark select option {
+  background-color: #1e1f21;
+}
+
+
+.Toastify__toast-container {
+  z-index: 999999 !important;
+}
+
+.Toastify__toast {
+  z-index: 999999 !important;
+}

@@ -1,6 +1,7 @@
 import axios from "axios";
+import { data } from "react-router-dom";
 
-const BASE_URL = "http://127.0.0.1:8000/api";
+const BASE_URL = "http://localhost:8000/api";
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -61,10 +62,7 @@ api.interceptors.response.use(
   }
 );
 
-
-
-
-
+// ALL API's
 
 export const signupApi = (data) =>
   api.post('auth/signup/', {
@@ -80,26 +78,42 @@ export const loginApi = (data) =>
     password: data.password,
   });
 
-
+//Show Profile
 export const profileApi = () =>
   api.get("auth/me/");
 
+//Create Project
 export const createProjectApi = (data) =>
-  api.post('auth/project/',{
-    name : data.name,
-    description: data.desc
-  });
+  api.post('auth/project/',data)
 
+  //Show projects
 export const showProjectApi = () =>
   api.get('auth/projects/'); 
 
-
+//Show project by Id
 export const getProjectByIdApi = (id) =>
-  api.get(`/projects/${id}/`);
+  api.get(`auth/projects/${id}/`);
 
+//Delete project
+export const deleteProjectApi = (id) =>
+  api.delete(`auth/project/delete/${id}/`)
+
+//Show Task
 export const getTasksApi = (projectId) =>
-  api.get(`/tasks/?project=${projectId}`);
+  api.get(`auth/tasks/?project=${projectId}`);
 
+//Create Task
 export const createTaskApi = (data) =>
-  api.post("/tasks/", data);
+  api.post("auth/tasks/create/", data);
 
+//Show task by Id
+export const getTaskByIdApi = (id) =>
+  api.get(`auth/tasks/details/${id}`);
+
+// Delete task
+export const deleteTaskApi = (id) =>
+  api.delete(`auth/tasks/delete/${id}/`);
+
+// Update task
+export const updateTaskApi = (id, data) =>
+  api.put(`auth/tasks/update/${id}/`, data);

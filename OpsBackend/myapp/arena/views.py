@@ -3,21 +3,22 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth import login
-from .models import User, UserInvite, Project, Task
-from .serializers import UserSerializer, SignupSerializer, LoginSerializer, AcceptInviteSerializer, InviteUserSerializer, GoogleAuthSerializer, ProjectSerializer, TaskSerializer
+from .models import User, UserInvite, Project, Task, Message
+from .serializers import UserSerializer, SignupSerializer, LoginSerializer, AcceptInviteSerializer, InviteUserSerializer, GoogleAuthSerializer, ProjectSerializer, TaskSerializer, MessageSerializer
 from .permissions import IsOrganizationMember, ReadOnlyForMembers, IsOwnerOrAdmin
 
 
 # Create your views here.
-
+# User detail
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsOrganizationMember]
@@ -44,7 +45,8 @@ class UserViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("OWNER account cannot be deleted")
 
         return super().destroy(request, *args, **kwargs)
-
+    
+# Signing Up
 class SignupView(APIView):
     permission_classes = []
 
@@ -66,7 +68,7 @@ class SignupView(APIView):
             status=status.HTTP_201_CREATED
         )
 
-
+# Login 
 class LoginView(APIView):
     permission_classes = []
 
@@ -91,7 +93,7 @@ class LoginView(APIView):
             status=status.HTTP_200_OK
         )
 
-
+# invite user
 class InviteUserView(APIView):
     permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
@@ -99,9 +101,33 @@ class InviteUserView(APIView):
         serializer = InviteUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        email = serializer.validated_data["email"]
+        organization = request.user.organization
+
+        #  Check if user already exists
+        existing_user = User.objects.filter(email=email).first()
+
+        if existing_user:
+            # If already in same org
+            if existing_user.organization == organization:
+                return Response(
+                    {"message": "User already in this organization"},
+                    status=status.HTTP_200_OK
+                )
+
+            # Add user to organization
+            existing_user.organization = organization
+            existing_user.save()
+
+            return Response(
+                {"message": "Existing user added to organization"},
+                status=status.HTTP_200_OK
+            )
+
+        # 📨 If user does NOT exist → create invite
         invite = UserInvite.objects.create(
-            email=serializer.validated_data['email'],
-            organization=request.user.organization
+            email=email,
+            organization=organization
         )
 
         invite_link = f"http://localhost:3000/accept-invite/{invite.token}"
@@ -110,15 +136,15 @@ class InviteUserView(APIView):
             subject="You're invited to join Arena",
             message=f"Click to join: {invite_link}",
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[invite.email],
+            recipient_list=[email],
         )
 
         return Response(
-            {"message": "Invitation sent"},
+            {"message": "Invitation sent successfully"},
             status=status.HTTP_201_CREATED
         )
 
-
+# Accept user 
 class AcceptInviteView(APIView):
     permission_classes = []
 
@@ -151,6 +177,7 @@ class AcceptInviteView(APIView):
             status=status.HTTP_201_CREATED
         )
 
+# Continue with Google
 class GoogleLoginView(APIView):
     permission_classes = []
 
@@ -190,6 +217,7 @@ class GoogleLoginView(APIView):
 
         return Response(
             {
+                "user": UserSerializer(user).data,
                 "access_token": str(refresh.access_token),
                 "refresh": str(refresh),
                 "user": UserSerializer(user).data
@@ -197,6 +225,7 @@ class GoogleLoginView(APIView):
             status=status.HTTP_200_OK
         )
 
+# Logout 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -207,7 +236,7 @@ class LogoutView(APIView):
 
         return Response({"message": "Logged out successfully"})
     
-
+# Profile
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -227,7 +256,7 @@ class MeView(APIView):
             }
         })
     
-
+# Create Projects
 class ProjectView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -244,6 +273,7 @@ class ProjectView(APIView):
             status=status.HTTP_201_CREATED
         )
 
+# Show projects
 class ShowProject(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -255,7 +285,8 @@ class ShowProject(APIView):
         serializer = ProjectSerializer(projects, many=True)
 
         return Response(serializer.data)
-
+    
+#Show project by id
 class ProjectDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -273,7 +304,48 @@ class ProjectDetailView(APIView):
 
         serializer = ProjectSerializer(project)
         return Response(serializer.data)
+    
+#Delete Project
+class ProjectDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def delete(self, request, id):
+
+        if not id:
+            raise ValidationError({"message":"ID required to delete the project"})
+
+        project = get_object_or_404(
+            Project, 
+            id=id,
+            organization=request.user.organization
+            )
+
+        project.delete()
+
+        return Response(
+            {"Message": "Project is Deleted"},
+            status = status.HTTP_200_OK
+        )   
+    
+# Create Task
+class TaskCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = TaskSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        serializer.save()
+
+        return Response(
+            {"message": "Task created successfully"},
+            status=status.HTTP_201_CREATED
+        )    
+
+# Show Task List
 class TaskListView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -288,18 +360,79 @@ class TaskListView(APIView):
         serializer = TaskSerializer(tasks, many=True)
         return Response(serializer.data)
 
-class TaskCreateView(APIView):
+
+#Show task detail by id
+class TaskDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def get(self, request, task_id):
+
+        if not task_id:
+            raise ValidationError({"task": "Task ID is required."})
+
+        task = get_object_or_404(
+            Task,
+            id=task_id,
+            organization=request.user.organization
+        )
+
+        serializer = TaskSerializer(task)
+        return Response(serializer.data)
+    
+ #Delete task   
+class DeleteTaskView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, task_id):
+
+        if not task_id:
+            raise ValidationError({"task": "Task ID is required."})
+
+        task = get_object_or_404(
+            Task,
+            id=task_id,
+            organization=request.user.organization
+        )
+
+        task.delete()
+
+        return Response(
+            {"message": "Task deleted"},
+            status=status.HTTP_200_OK
+        )
+    
+#Update Task
+class UpdateTaskView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, task_id):
+
+        if not task_id:
+            raise ValidationError({"task": "Task ID is required."})
+
+        task = get_object_or_404(
+            Task,
+            id=task_id,
+            organization=request.user.organization
+        )
+
         serializer = TaskSerializer(
+            task,
             data=request.data,
+            partial=True,   
             context={"request": request}
         )
+
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        return Response(
-            {"message": "Task created successfully"},
-            status=status.HTTP_201_CREATED
-        )
+        return Response(serializer.data)
+    
+
+class ChannelMessagesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, channel_id):
+        messages = Message.objects.filter(channel_id=channel_id)
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)

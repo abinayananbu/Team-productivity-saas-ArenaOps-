@@ -4,7 +4,7 @@ export const isAuthenticated = () => {
 };
 
 export const logOut = () => {
-    localStorage.removeItem("access_token");
-    window.location.href = "/";  // Redirect to login page
+    localStorage.removeItem("access");  // Redirect to login page
+    window.location.href = "/" 
 };
 

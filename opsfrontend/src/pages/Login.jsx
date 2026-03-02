@@ -1,49 +1,86 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { loginApi } from "../services/api"; 
 import { GoogleLogin } from "@react-oauth/google";
 import { api } from "../services/api";
-
+import { isAuthenticated } from "../services/Auth";
+import { toast } from "react-toastify";
+import {EyeOff, Eye} from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
 
+  const [showPassword, setShowPassword] = useState(false);
+
+  //Auto-redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // 🔐 Normal login
+  //  Normal login
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    toast.dismiss();
+
+    if (!form.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+
+    if (!form.password.trim() || form.password.length < 6) {
+      toast.error("Please enter you password");
+      return;
+    }
+
     try {
       const res = await loginApi(form);
-
+      localStorage.setItem("user", res.data.user.email);
       localStorage.setItem("access", res.data.access_token);
       localStorage.setItem("refresh", res.data.refresh);
-      navigate("/dashboard");
+      toast.success("Welcome back! 🍾")
+      setTimeout(()=>navigate("/dashboard"),1000)
     } catch (err) {
       console.error(err.response?.data || err);
+      const errorMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Signup failed. Please try again.";
+
+      toast.error(errorMessage);
     }
   };
 
-  // 🔐 Google login
+  //  Google login
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       const res = await api.post("/auth/google/", {
         token: credentialResponse.credential,
       });
-
+      localStorage.setItem("user", res.data.user.email);
       localStorage.setItem("access", res.data.access_token);
       localStorage.setItem("refresh", res.data.refresh);
-      navigate("/dashboard");
+      toast.success("Welcome back! 🍾")
+      setTimeout(()=>navigate("/dashboard"),1500)
     } catch (err) {
       console.error("Google login failed", err);
+      const errorMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Signup failed. Please try again.";
+
+      toast.error(errorMessage);
     }
   };
 
@@ -59,6 +96,7 @@ export default function LoginPage() {
         <h1 className="text-2xl font-extrabold text-indigo-600 text-center mb-4">
           ArenaOps
         </h1>
+        
         {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Welcome back</h1>
@@ -67,7 +105,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* onSubmit  FORM */}
+        {/* Form */}
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -78,23 +116,30 @@ export default function LoginPage() {
               name="email"
               value={form.email}
               onChange={handleChange}
-              required
+              placeholder="Enter email"
               className="mt-1 w-full rounded-lg border px-4 py-2 focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700">
               Password
             </label>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               name="password"
               value={form.password}
               onChange={handleChange}
-              required
+              placeholder="Enter password"
               className="mt-1 w-full rounded-lg border px-4 py-2 focus:ring-2 focus:ring-indigo-500"
             />
+             <button
+              type="button"
+              className="absolute mt-3 right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 opacity-50 hover:opacity-100"
+              onClick={() => setShowPassword(!showPassword)}
+              >
+             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+             </button>
           </div>
 
           <motion.button
@@ -114,30 +159,28 @@ export default function LoginPage() {
           <div className="flex-grow h-px bg-gray-200" />
         </div>
 
-        {/* Social Login */}
-       <div className="space-y-3">
-        <GoogleLogin
-          onSuccess={handleGoogleSuccess}
-          onError={() => console.log("Google Login Failed")}
-          render={(renderProps) => (
+        {/* Google Login */}
+        <div className="space-y-3">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => console.log("Google Login Failed")}
+          >
             <button
-              onClick={renderProps.onClick}
-              disabled={renderProps.disabled}
               className="w-full flex items-center justify-center gap-2 border rounded-lg py-2 hover:bg-gray-50"
             >
               <img
                 src="https://www.svgrepo.com/show/475656/google-color.svg"
+                alt="Google"
                 className="w-5 h-5"
               />
               Continue with Google
             </button>
-          )}
-        />
+          </GoogleLogin>
         </div>
 
         {/* Footer */}
         <p className="text-center text-sm text-gray-500 mt-6">
-          Don’t have an account?{" "}
+          Don't have an account?{" "}
           <Link
             to="/signup"
             className="text-indigo-600 font-medium hover:underline"

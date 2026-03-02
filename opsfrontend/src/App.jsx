@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ToastContainer, Bounce } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import LoginPage from "./pages/Login";
 import SignupPage from "./pages/Signup";
 import DashBoardPage from "./pages/Dashboard";
@@ -9,12 +11,14 @@ import DocsPage from "./pages/DocsPage";
 import ChatPage from "./pages/ChatPage";
 import ProfilePage from "./pages/Profile";
 import ProjectsPage from "./pages/ProjectsPage";
+import IntroductionPage from "./pages/Introduction";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<LoginPage />} />
+        <Route path="/" element={<IntroductionPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route
           path="/dashboard"
@@ -36,7 +40,7 @@ function App() {
           path="/projects"
           element={
             <PrivateRoute>
-              <ProjectsPage/>
+              <ProjectsPage />
             </PrivateRoute>
           }
         />
@@ -44,7 +48,7 @@ function App() {
           path="/projectdetail/:id"
           element={
             <PrivateRoute>
-              <ProjectDetailsPage/>
+              <ProjectDetailsPage />
             </PrivateRoute>
           }
         />
@@ -68,11 +72,26 @@ function App() {
           path="/profile"
           element={
             <PrivateRoute>
-              <ProfilePage/>
+              <ProfilePage />
             </PrivateRoute>
           }
         />
       </Routes>
+      
+     <ToastContainer
+        position="top-right"
+        autoClose={2000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+        transition={Bounce}
+        style={{ zIndex: 999999 }}
+      />
     </BrowserRouter>
   );
 }
