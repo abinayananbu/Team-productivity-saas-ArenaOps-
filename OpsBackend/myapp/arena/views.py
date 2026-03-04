@@ -3,11 +3,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError, AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from django.shortcuts import get_object_or_404
+from datetime import timedelta
 from django.conf import settings
 from django.core.mail import send_mail
 from django.conf import settings
@@ -46,53 +47,107 @@ class UserViewSet(viewsets.ModelViewSet):
 
         return super().destroy(request, *args, **kwargs)
     
-# Signing Up
+ACCESS_COOKIE = "access_token"
+REFRESH_COOKIE = "refresh_token"
+
+COOKIE_SETTINGS = {
+    "httponly": True,
+    "secure": False,
+    "samesite": "Lax",
+    "path": "/",
+}
+
 class SignupView(APIView):
     permission_classes = []
 
     def post(self, request):
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         user = serializer.save()
-
         refresh = RefreshToken.for_user(user)
 
-        return Response(
-            {
-                "message": "Signup successful",
-                "access_token": str(refresh.access_token),
-                "refresh": str(refresh),
-                "user": UserSerializer(user).data
-            },
+        response = Response(
+            {"message": "Signup successful", "user": UserSerializer(user).data},
             status=status.HTTP_201_CREATED
         )
+        response.set_cookie(key=ACCESS_COOKIE, value=str(refresh.access_token), **COOKIE_SETTINGS)
+        response.set_cookie(key=REFRESH_COOKIE, value=str(refresh), **COOKIE_SETTINGS)
+        return response
 
-# Login 
+
 class LoginView(APIView):
     permission_classes = []
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        user = serializer.validated_data['user']
-
-        # Django session login
-        login(request, user)
-        # Django token
+        user = serializer.validated_data["user"]
         refresh = RefreshToken.for_user(user)
 
-        return Response(
-            {
-                "message": "Login successful",
-                "user": UserSerializer(user).data,
-                "access_token": str(refresh.access_token),
-                "refresh": str(refresh)
-            },
-            status=status.HTTP_200_OK
+        response = Response({"message": "Login successful"}, status=status.HTTP_200_OK)
+        response.set_cookie(key=ACCESS_COOKIE, value=str(refresh.access_token), **COOKIE_SETTINGS)
+        response.set_cookie(key=REFRESH_COOKIE, value=str(refresh), **COOKIE_SETTINGS)
+        return response
+
+
+class CookieTokenRefreshView(APIView):
+    permission_classes = []  
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get(REFRESH_COOKIE)
+        if not refresh_token:
+            raise AuthenticationFailed("No refresh token")
+        try:
+            token = RefreshToken(refresh_token)
+            response = Response({"message": "Token refreshed"})
+            response.set_cookie(key=ACCESS_COOKIE, value=str(token.access_token), **COOKIE_SETTINGS)
+            return response
+        except Exception:
+            raise AuthenticationFailed("Invalid refresh token")
+
+
+class LogoutView(APIView):
+    permission_classes = [] 
+
+    def post(self, request):
+        try:
+            token = RefreshToken(request.COOKIES.get(REFRESH_COOKIE))
+            token.blacklist()
+        except Exception:
+            pass
+        response = Response({"message": "Logged out"}, status=status.HTTP_200_OK)
+        response.delete_cookie(ACCESS_COOKIE, path="/")
+        response.delete_cookie(REFRESH_COOKIE, path="/")
+        return response
+
+
+class GoogleLoginView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        serializer = GoogleAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data["token"]
+
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                token, requests.Request(), settings.GOOGLE_CLIENT_ID
+            )
+        except ValueError:
+            return Response({"error": "Invalid Google token"}, status=400)
+
+        email = idinfo["email"]
+        user, _ = User.objects.get_or_create(
+            email=email,
+            defaults={"organization": None, "role": "MEMBER"}
         )
 
+        refresh = RefreshToken.for_user(user)
+        response = Response({"user": UserSerializer(user).data}, status=200)
+        response.set_cookie(key=ACCESS_COOKIE, value=str(refresh.access_token), **COOKIE_SETTINGS)
+        response.set_cookie(key=REFRESH_COOKIE, value=str(refresh), **COOKIE_SETTINGS)
+        return response
+    
 # invite user
 class InviteUserView(APIView):
     permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
@@ -177,64 +232,7 @@ class AcceptInviteView(APIView):
             status=status.HTTP_201_CREATED
         )
 
-# Continue with Google
-class GoogleLoginView(APIView):
-    permission_classes = []
 
-    def post(self, request):
-        serializer = GoogleAuthSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        token = serializer.validated_data["token"]
-
-        try:
-            idinfo = id_token.verify_oauth2_token(
-                token,
-                requests.Request(),
-                settings.GOOGLE_CLIENT_ID
-            )
-        except ValueError:
-            return Response(
-                {"error": "Invalid Google token"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        email = idinfo["email"]
-
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                "organization": None,
-                "role": "MEMBER",
-            }
-        )
-
-        if created:
-            # Optional: create personal org or wait for invite
-            pass
-
-        refresh = RefreshToken.for_user(user)
-
-        return Response(
-            {
-                "user": UserSerializer(user).data,
-                "access_token": str(refresh.access_token),
-                "refresh": str(refresh),
-                "user": UserSerializer(user).data
-            },
-            status=status.HTTP_200_OK
-        )
-
-# Logout 
-class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        refresh_token = request.data.get("refresh")
-        token = RefreshToken(refresh_token)
-        token.blacklist()
-
-        return Response({"message": "Logged out successfully"})
     
 # Profile
 class MeView(APIView):

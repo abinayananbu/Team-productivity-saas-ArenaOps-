@@ -88,6 +88,7 @@ class GoogleAuthSerializer(serializers.Serializer):
 
 class ProjectSerializer(serializers.ModelSerializer):
     task_count = serializers.SerializerMethodField()
+    task_assigned_member_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -99,6 +100,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'created_at',
             'tags',
             'task_count',
+            'task_assigned_member_count',
         ]
         read_only_fields = ['created_at', 'created_by']
         
@@ -114,8 +116,15 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_task_count(self, obj):
         return obj.task_set.count()
     
+    def get_task_assigned_member_count(self, obj):
+        return obj.task_set.filter(assigned_to__isnull=False).values('assigned_to').distinct().count()
+    
 
 class TaskSerializer(serializers.ModelSerializer):
+    assigned_to_email = serializers.CharField(
+        source="assigned_to.email",
+        read_only=True
+    )
 
     class Meta:
         model = Task
@@ -129,6 +138,7 @@ class TaskSerializer(serializers.ModelSerializer):
             'deadline',
             'project',
             'assigned_to',
+            'assigned_to_email',
             'created_at',
             'updated_at',
         ]

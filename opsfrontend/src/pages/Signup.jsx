@@ -3,23 +3,17 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { signupApi, api } from "../services/api";
 import { GoogleLogin } from "@react-oauth/google";
-import { isAuthenticated } from "../services/Auth";
 import { toast } from "react-toastify";
+import { EyeOff, Eye } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const {isAuthenticated} = useAuth();
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
 
-  useEffect(() => {
-    if (isAuthenticated()) {
-      navigate("/dashboard");
-    }
-  }, [navigate]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -33,59 +27,44 @@ export default function SignupPage() {
       toast.error("Organization name is required");
       return;
     }
-
     if (!form.email.trim()) {
       toast.error("Email is required");
       return;
     }
-
     if (!form.password.trim() || form.password.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
     }
 
     try {
-      const res = await signupApi(form);
-
-      // unified token keys
-      localStorage.setItem("access", res.data.access_token);
-      localStorage.setItem("refresh", res.data.refresh);
-
+      await signupApi(form);
+      // ✅ removed localStorage - cookies set by backend automatically
       toast.success("Account created successfully 🎉");
-
-      setTimeout(() => navigate("/login"), 500);
+      setTimeout(() => navigate("/dashboard"), 500); // ✅ go to dashboard, not login
     } catch (err) {
-      console.error(err);
-
       const errorMessage =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
         "Signup failed. Please try again.";
-
       toast.error(errorMessage);
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      const res = await api.post("/auth/google/", {
+      await api.post("auth/google/", { // ✅ removed leading slash
         token: credentialResponse.credential,
       });
-
-      localStorage.setItem("access", res.data.access_token);
-      localStorage.setItem("refresh", res.data.refresh);
-
-      toast.success("Welcome back! 🚀");
-      navigate("/dashboard");
+      // ✅ removed localStorage
+      toast.success("Welcome! 🚀");
+      setTimeout(() => navigate("/dashboard"), 1000);
     } catch (err) {
-      console.error(err);
       toast.error("Google login failed");
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-black flex items-center justify-center px-4">
-
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
@@ -97,19 +76,13 @@ export default function SignupPage() {
         </h1>
 
         <div className="text-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-900">
-            Create your account
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Start managing your team smarter
-          </p>
+          <h2 className="text-3xl font-bold text-gray-900">Create your account</h2>
+          <p className="text-sm text-gray-500 mt-1">Start managing your team smarter</p>
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Organization name
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Organization name</label>
             <input
               type="text"
               name="name"
@@ -121,9 +94,7 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Email</label>
             <input
               type="email"
               name="email"
@@ -134,18 +105,23 @@ export default function SignupPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700">Password</label>
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               name="password"
               value={form.password}
               onChange={handleChange}
               placeholder="Enter password"
               className="mt-1 w-full rounded-lg border px-4 py-2 focus:ring-2 focus:ring-indigo-500"
             />
+            <button
+              type="button"
+              className="absolute mt-3 right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 opacity-70 hover:opacity-100"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
 
           <motion.button
@@ -171,11 +147,8 @@ export default function SignupPage() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{" "}
-          <Link to="/login" className="text-indigo-600 hover:underline">
-            Login
-          </Link>
+          <Link to="/login" className="text-indigo-600 hover:underline">Login</Link>
         </p>
-        
       </motion.div>
     </div>
   );

@@ -1,9 +1,8 @@
 import { Bell, Search, Sun, Moon, ChevronDown } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { logOut } from "../services/Auth";
 import { useTheme } from "../context/ThemeContext";
 import { useNavigate, useLocation } from "react-router-dom";
-import { profileApi } from "../services/api";
+import { profileApi, logoutApi } from "../services/api";
 import logo from "../assets/arenaOps.png"
 
 export default function Navbar() {
@@ -31,6 +30,15 @@ export default function Navbar() {
       })
       .catch(() => console.error("Failed to load profile"));
   }, []);
+
+  const logOut = async() =>{
+      try{
+         await logoutApi()
+         navigate("/login")
+      }catch{
+        console.error("Logout failed")
+      }
+    }
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -279,7 +287,14 @@ export default function Navbar() {
         {/* User menu */}
         <div className="relative" ref={userRef}>
           <img
-            src={user?.avatar || "https://i.pravatar.cc/120"}
+            src={
+              user
+                ? user.avatar ||
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    user.name || user.email || "User"
+                  )}`
+                : "https://ui-avatars.com/api/?name=User"
+            }
             alt="User avatar"
             onClick={() => {
               setUserOpen(!userOpen);

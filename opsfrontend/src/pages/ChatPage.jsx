@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import WorkspaceLayout from "../layouts/WorkspaceLayout";
 import { Send, Hash, Plus } from "lucide-react";
+import  {useAuth} from '../context/AuthContext'
 
 export default function ChatPage() {
   const [channels] = useState([
@@ -10,18 +11,16 @@ export default function ChatPage() {
   const [activeChannel, setActiveChannel] = useState(channels[0]);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [currentUserEmail, setCurrentUserEmail] = useState("");  
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const {user} = useAuth();  
 
   const socketRef = useRef(null);
 
-  // Load current user email (from localStorage/JWT/etc.)
   useEffect(() => {
-    const user = localStorage.getItem("user");
     if (user) {
-      setCurrentUserEmail( user || "");
+      setCurrentUserEmail(user.email);
     }
-  }, []);
-
+  }, [user]);
   
   const getUsername = (email) => email ? email.split('@')[0] : "other";
 
@@ -29,10 +28,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (!activeChannel) return;
 
-    const token = localStorage.getItem("access");
-    const socket = new WebSocket(
-      `ws://localhost:8000/ws/chat/1/?token=${token}`
-    );
+    const socket = new WebSocket(`ws://localhost:8000/ws/chat/1/`);
 
     socketRef.current = socket; 
 
@@ -63,16 +59,16 @@ export default function ChatPage() {
 
   // Send via WebSocket (unchanged)
   function sendMessage() {
-    if (!input.trim() || !socketRef.current) return;
-
-    socketRef.current.send(
-      JSON.stringify({
-        message: input,
-      })
-    );
-
-    setInput("");
+  if (!input.trim() || !socketRef.current) return;
+  
+  if (socketRef.current.readyState !== WebSocket.OPEN) {
+    console.warn("WebSocket not open, reconnecting...");
+    return;
   }
+
+  socketRef.current.send(JSON.stringify({ message: input }));
+  setInput("");
+}
 
   // JSX with FIXED message display
   return (

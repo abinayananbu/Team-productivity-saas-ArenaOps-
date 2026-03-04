@@ -1,7 +1,51 @@
+import { useEffect, useState } from "react";
 import WorkspaceLayout from "../layouts/WorkspaceLayout";
 import { CheckCircle, Folder, Users, Clock } from "lucide-react";
+import { orgMembersApi, showProjectApi } from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 export default function DashBoardPage() {
+  const [project, setProject] = useState([]);
+  const [member, setMember] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [projectRes, membersRes] = await Promise.all([
+        showProjectApi(), 
+        orgMembersApi(),    
+      ]);
+
+      setProject(Array.isArray(projectRes.data) ? projectRes.data : []);
+      setMember(Array.isArray(membersRes.data) ? membersRes.data : []);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalTasks = project.reduce(
+    (sum, p) => sum + (p.task_count || 0),
+    0
+  );
+
+  if (loading) {
+    return (
+      <WorkspaceLayout>
+        <div className="p-6 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      </WorkspaceLayout>
+    );
+  }
+
   return (
     <WorkspaceLayout>
       <div className="p-6 space-y-6">
@@ -17,9 +61,15 @@ export default function DashBoardPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Projects" value="12" icon={Folder} />
-          <StatCard title="Tasks" value="84" icon={CheckCircle} />
-          <StatCard title="Team Members" value="8" icon={Users} />
+          <StatCard 
+            title="Projects" 
+            value={project.length} 
+            icon={Folder} 
+            navigate={navigate}
+            path="/projects" 
+          />
+          <StatCard title="Tasks" value={totalTasks} icon={CheckCircle} />
+          <StatCard title="Team Members" value={member.length} icon={Users} />
           <StatCard title="Due Today" value="5" icon={Clock} />
         </div>
 
@@ -75,11 +125,20 @@ export default function DashBoardPage() {
   );
 }
 
-/* Reusable Stat Card */
-function StatCard({ title, value, icon: Icon }) {
+/* Reusable StatCard - Fixed navigation */
+function StatCard({ title, value, icon: Icon, navigate, path }) {
+  const handleClick = () => {
+    if (path && navigate) {
+      navigate(path);
+    }
+  };
+
   return (
-    <div className="bg-white dark:bg-[#1e1f21] border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-center gap-4">
-      <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10">
+    <div 
+      onClick={handleClick}
+      className="group cursor-pointer bg-white dark:bg-[#1e1f21] border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-center gap-4 hover:shadow-md transition-all duration-200 hover:-translate-y-1"
+    >
+      <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/20 transition-colors">
         <Icon size={20} className="text-indigo-600 dark:text-indigo-400" />
       </div>
 

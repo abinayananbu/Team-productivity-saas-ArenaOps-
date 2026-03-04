@@ -1,59 +1,61 @@
 import axios from "axios";
-import { data } from "react-router-dom";
 
 const BASE_URL = "http://localhost:8000/api";
 
 export const api = axios.create({
   baseURL: BASE_URL,
+  withCredentials: true,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-/* =======================
-   REQUEST INTERCEPTOR
-======================= */
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("access");
+let isRefreshing = false;
+let failedQueue = [];
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+const processQueue = (error = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) prom.reject(error);
+    else prom.resolve();
+  });
+  failedQueue = [];
+};
 
-    console.log("➡️", config.method?.toUpperCase(), config.url);
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-/* =======================
-   RESPONSE INTERCEPTOR
-======================= */
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
+    if (originalRequest.url?.includes("auth/refresh/") ||
+        originalRequest.url?.includes("auth/login/")) {
+        return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(() => api(originalRequest))
+          .catch((err) => Promise.reject(err));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
-        const refresh = localStorage.getItem("refresh");
+        await api.post("auth/refresh/", {});
 
-        const res = await axios.post(
-          `${BASE_URL}/auth/token/refresh/`,
-          { refresh }
-        );
-
-        localStorage.setItem("access", res.data.access);
-
-        originalRequest.headers.Authorization = `Bearer ${res.data.access}`;
+        isRefreshing = false;
+        processQueue();
         return api(originalRequest);
+
       } catch (err) {
-        localStorage.clear();
-        window.location.href = "/";
+        isRefreshing = false;
+        processQueue(err);
+        console.assertlog(err);
+        window.location.href = "/login";
         return Promise.reject(err);
       }
     }
@@ -62,58 +64,35 @@ api.interceptors.response.use(
   }
 );
 
-// ALL API's
-
+// AUTH
 export const signupApi = (data) =>
-  api.post('auth/signup/', {
+  api.post("auth/signup/", {
     organization_name: data.name,
     email: data.email,
     password: data.password,
   });
 
-
 export const loginApi = (data) =>
-    api.post('auth/login/', {
+  api.post("auth/login/", {
     email: data.email,
     password: data.password,
   });
 
-//Show Profile
-export const profileApi = () =>
-  api.get("auth/me/");
+export const logoutApi = () => api.post("auth/logout/");
+export const profileApi = () => api.get("auth/me/");
 
-//Create Project
-export const createProjectApi = (data) =>
-  api.post('auth/project/',data)
+// PROJECTS
+export const createProjectApi = (data) => api.post("auth/project/", data);
+export const showProjectApi = () => api.get("auth/projects/");
+export const getProjectByIdApi = (id) => api.get(`auth/projects/${id}/`);
+export const deleteProjectApi = (id) => api.delete(`auth/project/delete/${id}/`);
 
-  //Show projects
-export const showProjectApi = () =>
-  api.get('auth/projects/'); 
+// TASKS
+export const getTasksApi = (projectId) => api.get(`auth/tasks/?project=${projectId}`);
+export const createTaskApi = (data) => api.post("auth/tasks/create/", data);
+export const getTaskByIdApi = (id) => api.get(`auth/tasks/details/${id}/`); // ✅ trailing slash
+export const deleteTaskApi = (id) => api.delete(`auth/tasks/delete/${id}/`);
+export const updateTaskApi = (id, data) => api.put(`auth/tasks/update/${id}/`, data);
 
-//Show project by Id
-export const getProjectByIdApi = (id) =>
-  api.get(`auth/projects/${id}/`);
-
-//Delete project
-export const deleteProjectApi = (id) =>
-  api.delete(`auth/project/delete/${id}/`)
-
-//Show Task
-export const getTasksApi = (projectId) =>
-  api.get(`auth/tasks/?project=${projectId}`);
-
-//Create Task
-export const createTaskApi = (data) =>
-  api.post("auth/tasks/create/", data);
-
-//Show task by Id
-export const getTaskByIdApi = (id) =>
-  api.get(`auth/tasks/details/${id}`);
-
-// Delete task
-export const deleteTaskApi = (id) =>
-  api.delete(`auth/tasks/delete/${id}/`);
-
-// Update task
-export const updateTaskApi = (id, data) =>
-  api.put(`auth/tasks/update/${id}/`, data);
+//Members
+export const orgMembersApi = () => api.get("users/");
