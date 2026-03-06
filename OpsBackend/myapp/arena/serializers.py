@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import Organization, Tag, Project, Task, Plan, Message
+from .models import Organization, Tag, Project, Task, Plan, Message, ActivityLog, Document
 
 User = get_user_model()
 
@@ -162,3 +162,37 @@ class MessageSerializer(serializers.ModelSerializer):
         model = Message
         fields = ["id", "channel", "user", "user_name", "content", "created_at"]
         read_only_fields = ["user", "created_at"]
+
+#Audit
+class ActivityLogSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ActivityLog
+        fields = ["action","user", "organization",'user_email', 'user_display', "metadata", "created_at"]
+        read_only_fields = ["user", "created_at"]
+
+    def get_user_display(self, obj):
+        if obj.user:
+            # Returns "john" from "john@example.com"
+            return obj.user.email.split('@')[0]
+        return 'System'    
+    
+#Document
+class DocumentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Document
+        fields = ["id", "organization", "user", "title" , "content", "created_at", "updated_at"]
+        read_only_fields = ["organization", "user", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        request = self.context['request']
+
+        return Document.objects.create(
+            user = request.user,
+            organization = request.user.organization,
+            **validated_data
+        )    
+

@@ -44,12 +44,12 @@ export default function LoginPage() {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      await api.post("auth/google/", {  // ✅ removed leading slash
+      await api.post("auth/google/", {  
         token: credentialResponse.credential,
       });
       //  removed localStorage - cookies are set by backend automatically
       toast.success("Welcome back! 🍾");
-      setTimeout(() => navigate("/dashboard"), 1500);
+      setTimeout(() => navigate("/dashboard"), 500);
     } catch (err) {
       const errorMessage =
         err?.response?.data?.message ||

@@ -90,9 +90,18 @@ export const deleteProjectApi = (id) => api.delete(`auth/project/delete/${id}/`)
 // TASKS
 export const getTasksApi = (projectId) => api.get(`auth/tasks/?project=${projectId}`);
 export const createTaskApi = (data) => api.post("auth/tasks/create/", data);
-export const getTaskByIdApi = (id) => api.get(`auth/tasks/details/${id}/`); // ✅ trailing slash
+export const getTaskByIdApi = (id) => api.get(`auth/tasks/details/${id}/`); 
 export const deleteTaskApi = (id) => api.delete(`auth/tasks/delete/${id}/`);
 export const updateTaskApi = (id, data) => api.put(`auth/tasks/update/${id}/`, data);
 
-//Members
+// Members
 export const orgMembersApi = () => api.get("users/");
+
+//Activity log
+export const showAuditApi = () => api.get("auth/activity-logs/")
+
+//Document
+export const createDocsApi = (data) => api.post("auth/documents/create/", data);  
+export const showDocsApi = () => api.get("/auth/documents/");
+export const saveDocApi = (docId, data) => api.patch(`/auth/documents/${docId}/`, data);
+export const deleteDocApi = (id) => api.delete(`auth/document/delete/${id}/`);

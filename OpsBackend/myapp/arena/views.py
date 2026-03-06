@@ -13,10 +13,10 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth import login
-from .models import User, UserInvite, Project, Task, Message
-from .serializers import UserSerializer, SignupSerializer, LoginSerializer, AcceptInviteSerializer, InviteUserSerializer, GoogleAuthSerializer, ProjectSerializer, TaskSerializer, MessageSerializer
+from .utils.audit import create_activity_log
+from .models import User, UserInvite, Project, Task, Message, ActivityLog, Document
+from .serializers import UserSerializer, SignupSerializer, LoginSerializer, AcceptInviteSerializer, InviteUserSerializer, GoogleAuthSerializer, ProjectSerializer, TaskSerializer, MessageSerializer, ActivityLogSerializer, DocumentSerializer
 from .permissions import IsOrganizationMember, ReadOnlyForMembers, IsOwnerOrAdmin
-
 
 # Create your views here.
 # User detail
@@ -84,6 +84,14 @@ class LoginView(APIView):
         user = serializer.validated_data["user"]
         refresh = RefreshToken.for_user(user)
 
+        create_activity_log(
+            user=user,
+            organization=user.organization,
+            action="👤logged in",
+            metadata={
+                "ip": request.META.get("REMOTE_ADDR"),
+            }
+        )
         response = Response({"message": "Login successful"}, status=status.HTTP_200_OK)
         response.set_cookie(key=ACCESS_COOKIE, value=str(refresh.access_token), **COOKIE_SETTINGS)
         response.set_cookie(key=REFRESH_COOKIE, value=str(refresh), **COOKIE_SETTINGS)
@@ -264,7 +272,18 @@ class ProjectView(APIView):
             context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        project = serializer.save()
+
+        # 🔥 Audit log
+        create_activity_log(
+            user=request.user,
+            organization=request.user.organization,
+            action="📁 New project created",
+            metadata={
+                "project_name": project.name,
+                "project_id": project.id
+            }
+        )
 
         return Response(
             {"message": "Project created successfully"},
@@ -320,6 +339,17 @@ class ProjectDeleteView(APIView):
 
         project.delete()
 
+        # 🔥 Audit log
+        create_activity_log(
+            user=request.user,
+            organization=request.user.organization,
+            action="❌ Existing project deleted",
+            metadata={
+                "project_name": project.name,
+                "project_id": project.id
+            }
+        )
+
         return Response(
             {"Message": "Project is Deleted"},
             status = status.HTTP_200_OK
@@ -336,7 +366,17 @@ class TaskCreateView(APIView):
         )
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
-        serializer.save()
+        task = serializer.save()
+
+        create_activity_log(
+            user=request.user,
+            organization=request.user.organization,
+            action="📁 New task created",
+            metadata={
+                "task_name": task.title,
+                "task_id": task.id
+            }
+        )
 
         return Response(
             {"message": "Task created successfully"},
@@ -394,6 +434,17 @@ class DeleteTaskView(APIView):
 
         task.delete()
 
+        # 🔥 Audit log
+        create_activity_log(
+            user=request.user,
+            organization=request.user.organization,
+            action="❌ Existing task deleted",
+            metadata={
+                "task_name": task.title,
+                "task_id": task.id
+            }
+        )
+
         return Response(
             {"message": "Task deleted"},
             status=status.HTTP_200_OK
@@ -424,6 +475,17 @@ class UpdateTaskView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
+        # 🔥 Audit log
+        create_activity_log(
+            user=request.user,
+            organization=request.user.organization,
+            action="✅ Existing task updated",
+            metadata={
+                "task_name": task.title,
+                "task_id": task.id
+            }
+        )
+
         return Response(serializer.data)
     
 
@@ -434,3 +496,78 @@ class ChannelMessagesView(APIView):
         messages = Message.objects.filter(channel_id=channel_id)
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)
+
+#Activity log
+class ActivityLogView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        logs = ActivityLog.objects.filter(
+            organization=request.user.organization
+        ).order_by("-created_at")[:8]
+
+        serializer = ActivityLogSerializer(logs, many=True)
+
+        return Response(serializer.data)
+    
+
+#Documentation
+class DocumentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = DocumentSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        document = serializer.save()
+        return Response({
+            "message": "Document created successfully",
+            "document": DocumentSerializer(document).data
+        }, status=status.HTTP_201_CREATED)
+
+class DocumentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        documents = Document.objects.filter(
+            organization=request.user.organization,
+            user=request.user
+        )
+        serializer = DocumentSerializer(documents, many=True)
+
+        return Response(serializer.data)
+    
+
+class DocumentDetailView(APIView):
+    def patch(self, request, pk):
+        document = Document.objects.get(pk=pk, user=request.user)
+        serializer = DocumentSerializer(document, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+    
+
+class DocumentDeleteView(APIView):
+    permission_classes = [IsAuthenticated]  
+
+    def delete(self, request, id):
+
+        if not id:
+            raise ValidationError({"Document": "Document ID is required."})
+
+        document = get_object_or_404(
+            Document,
+            id=id,
+            user = request.user,
+        ) 
+
+        document.delete()  
+        
+        return Response({
+            "message": "Document deleted successfully",
+        }, status=status.HTTP_200_OK)    

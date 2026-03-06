@@ -1,4 +1,4 @@
-import { Plus, Folder, Trash2, Search } from "lucide-react";
+import { Plus, Folder, Trash2, Search,CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkspaceLayout from "../layouts/WorkspaceLayout";
@@ -11,8 +11,11 @@ export default function ProjectsPage() {
   const [desc, setDesc] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [error, setError] = useState(null)
+  const [projectToDelete, setProjectToDelete] = useState(null);
 
   // Fetch projects properly
   const fetchProjects = async () => {
@@ -22,6 +25,7 @@ export default function ProjectsPage() {
       setProjects(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to fetch projects", err);
+      setError("Failed to load project data. Please refresh.")
     } finally {
       setLoading(false);
     }
@@ -56,8 +60,6 @@ export default function ProjectsPage() {
   };
 
   const deleteProject = async (id) => {
-    if (!confirm("Are you sure you want to delete this project?")) return;
-
     try {
       setDeletingId(id);
       await deleteProjectApi(id);
@@ -74,7 +76,28 @@ export default function ProjectsPage() {
     project.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading && projects.length === 0) {
+  if (error) {
+    return (
+      <WorkspaceLayout>
+        <div className="p-6 flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-red-500 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">{error}</h3>
+            <button 
+              onClick={fetchProjects}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </WorkspaceLayout>
+    );
+  }
+
+  if (loading ) {
     return (
       <WorkspaceLayout>
         <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -215,7 +238,8 @@ export default function ProjectsPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation(); 
-                      deleteProject(p.id); 
+                      setShowDeleteConfirm(true)
+                      setProjectToDelete(p.id)
                     }}
                     disabled={deletingId === p.id}
                     className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-all duration-200 opacity-0 group-hover:opacity-100"
@@ -232,6 +256,32 @@ export default function ProjectsPage() {
             ))}
           </div>
         )}
+        {showDeleteConfirm && (
+             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-white dark:bg-[#1e1f21] rounded-xl shadow-lg w-full max-w-sm p-6 space-y-4">
+                  <h3 className="text-lg font-semibold">Confirm Delete</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                   Are you sure you want to delete this task? 
+                  </p>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-4 py-2 text-sm rounded border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { setShowDeleteConfirm(false); deleteProject(projectToDelete); }}
+                      className="px-4 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
       </div>
     </WorkspaceLayout>
   );

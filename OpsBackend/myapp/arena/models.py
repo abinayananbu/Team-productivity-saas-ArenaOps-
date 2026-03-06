@@ -188,3 +188,17 @@ class Message(models.Model):
 
     class Meta:
         ordering = ["created_at"]    
+
+
+class Document(models.Model):
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="documents")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="documents")
+    title = models.CharField(max_length=150)
+    content = models.TextField(blank=True) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return self.title
+
+    
