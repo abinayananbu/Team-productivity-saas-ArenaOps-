@@ -111,7 +111,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=180),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=480),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -137,3 +137,8 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
+
+CSRF_TRUSTED_ORIGINS = ["http://localhost:5173"]
+
+SESSION_COOKIE_DOMAIN = "localhost"
+CSRF_COOKIE_DOMAIN = "localhost"

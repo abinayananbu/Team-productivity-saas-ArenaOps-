@@ -1,5 +1,5 @@
-import { Plus } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Plus, ArrowLeft } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import WorkspaceLayout from "../layouts/WorkspaceLayout";
 import {
@@ -18,6 +18,8 @@ import TaskDetailModal from "../components/tasks/TaskDetailModal";
 
 export default function ProjectDetailsPage() {
   const { id } = useParams();
+
+  const navigate =useNavigate();
 
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -172,13 +174,20 @@ export default function ProjectDetailsPage() {
       <div className="p-6 space-y-6">
         {/* HEADER */}
         <div className="flex items-center justify-between">
-          <div>
+          <div className="pt-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors mb-6"
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
             <div className="flex gap-3 items-center">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 {project.name}
               </h1>
               {project.description && (
-                <span className="text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">
+                <span className="text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full capitalize">
                   {project.description}
                 </span>
               )}
@@ -196,13 +205,16 @@ export default function ProjectDetailsPage() {
             Add Task
           </button>
         </div>
-
+        {tasks.length != 0 && (
+          <>
         {/* TASK STATS */}
-        <TaskStats tasks={tasks} />
+        <TaskStats tasks={tasks} />  
+        </>
+         )}
 
         {/* TASK LIST */}
         <TaskList tasks={tasks} onTaskClick={showTaskDetail} />
-
+          
         {/* CREATE TASK MODAL */}
         {openTask && (
           <CreateTaskModal

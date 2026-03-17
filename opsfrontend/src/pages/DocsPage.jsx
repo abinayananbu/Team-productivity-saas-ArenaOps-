@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import WorkspaceLayout from "../layouts/WorkspaceLayout";
-import { FileText, Plus, Loader2, Trash } from "lucide-react";
+import { FileText, Plus, Loader2, Trash, Download } from "lucide-react";
 import { createDocsApi, showDocsApi , saveDocApi, deleteDocApi   } from "../services/api";
+import { jsPDF } from "jspdf";
+//import Tooltip from '../components/Tooltip';
 
 // Simple debounce utility (no external deps)
 function useDebounce(callback, delay) {
@@ -77,7 +79,6 @@ export default function DocsPage() {
 
       const res = await createDocsApi(payload);
       const newDoc = res.data;
-      setDocs((prev) => [newDoc, ...prev]);
       setActiveDocId(newDoc.id); 
       loadData();
     } catch (err) {
@@ -92,11 +93,56 @@ export default function DocsPage() {
     try{
       await deleteDocApi(id);
       loadData();
-    }catch{
+    }catch (err){
       console.error("Document deletion failed:", err);
       setError("Failed to delete document. Please try again.");
     }
   }
+
+ const downloadAsPDF = (docId) => {
+  const docObj = docs.find(d => d.id === docId);
+  if (!docObj) return;
+
+  const pdfDoc = new jsPDF();
+  const pageHeight = pdfDoc.internal.pageSize.height;
+  const margin = 20;
+  let yPosition = 40; // Start after title
+
+  // Title (stays on first page)
+  pdfDoc.setFontSize(20);
+  pdfDoc.setFont("helvetica", "bold");
+  pdfDoc.text(docObj.title || "Untitled Doc", margin, 25);
+  
+  // Underline
+  pdfDoc.setLineWidth(0.5);
+  pdfDoc.line(margin, 30, 190, 30);
+
+  // Content with automatic page breaks
+  pdfDoc.setFontSize(12);
+  pdfDoc.setFont("helvetica", "normal");
+  
+  const content = docObj.content || "No content";
+  const splitContent = pdfDoc.splitTextToSize(content, 170);
+  
+  splitContent.forEach((line) => {
+    // Check if next line would exceed page height
+    if (yPosition > (pageHeight - margin)) {
+      pdfDoc.addPage();
+      yPosition = margin; // Reset to top margin on new page
+    }
+    
+    // Add the line
+    pdfDoc.text(line, margin, yPosition);
+    yPosition += 6; // Line height
+  });
+
+  // Clean filename
+  const cleanTitle = (docObj.title || "Document").replace(/[^a-zA-Z0-9]/g, '_');
+  pdfDoc.save(`${cleanTitle}_${docObj.id}.pdf`);
+};
+
+
+
 
   return (  
     <WorkspaceLayout>
@@ -149,14 +195,21 @@ export default function DocsPage() {
                   <FileText size={14} className="shrink-0" />
                   <span className="truncate">{doc.title || "Untitled Doc"}</span>
                 </div>
-                <div
+                <div className="flex items-center gap-2">
+                  <button 
+                  onClick={(e)=>{e.stopPropagation(); downloadAsPDF(doc.id)}}
+                  className="shrink-0 rounded hover:text-green-500 transition-colors opacity-0 group-hover:opacity-100">
+                    <Download size={11} />
+                  </button>
+                <button
                   role="button"
                   tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); setProjectToDelete(doc.id); }}
                   onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(),setShowDeleteConfirm(true) , setProjectToDelete(doc.id))}
                   className="shrink-0 rounded hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                 >
-                  <Trash size={10} />
+                  <Trash size={11} />
+                </button>
                 </div>
               </div>
             ))}

@@ -4,6 +4,8 @@ import { useTheme } from "../context/ThemeContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { profileApi, logoutApi } from "../services/api";
 import logo from "../assets/arenaOps.png"
+import { setHasSession } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -16,6 +18,8 @@ export default function Navbar() {
   const { dark, setDark } = useTheme();
   const [user, setUser] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const { setUser: setAuthUser, setIsAuthenticated } = useAuth();
 
   const workspaceRef = useRef(null);
   const userRef = useRef(null);
@@ -31,14 +35,19 @@ export default function Navbar() {
       .catch(() => console.error("Failed to load profile"));
   }, []);
 
-  const logOut = async() =>{
-      try{
-         await logoutApi()
-         navigate("/login")
-      }catch{
-        console.error("Logout failed")
-      }
+  const logOut = async () => {
+    try {
+      await logoutApi();
+    } catch {
+      console.error("Logout failed");
+    } finally {
+      setAuthUser(null);
+      setIsAuthenticated(false);
+      setHasSession(false);
+      window.location.href = "/"; 
     }
+  };
+
 
   // Close dropdowns when clicking outside
   useEffect(() => {

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import WorkspaceLayout from "../layouts/WorkspaceLayout";
 import { CheckCircle, Folder, Users, Clock } from "lucide-react";
 import { orgMembersApi, showAuditApi, showProjectApi } from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function DashBoardPage() {
   const [project, setProject] = useState([]);
@@ -12,14 +13,15 @@ export default function DashBoardPage() {
   const [auditlog, setAuditlog] = useState([]);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const intervalRef = useRef(null);
+  const pollingInterval = 20000;
+
+  const { user } = useAuth();
+  const currentEmail = user?.email;
 
   const loadData = async () => {
+    
     try {
-      setLoading(true);
-      setError(null);
       const [projectRes, membersRes, auditRes] = await Promise.all([
         showProjectApi(), 
         orgMembersApi(), 
@@ -32,21 +34,57 @@ export default function DashBoardPage() {
     } catch (err) {
       console.error("Failed to fetch data:", err);
       setError("Failed to load dashboard data. Please refresh.");
-    } finally {
-      setLoading(false);
     }
   };
 
+
+  useEffect(() => {
+    
+    const loadInitial = async () => {
+      setLoading(true);
+      try {
+        const [projectRes, membersRes, auditRes] = await Promise.all([
+          showProjectApi(), 
+          orgMembersApi(), 
+          showAuditApi(),   
+        ]);
+        setProject(Array.isArray(projectRes.data) ? projectRes.data : []);
+        setMember(Array.isArray(membersRes.data) ? membersRes.data : []);
+        setAuditlog(Array.isArray(auditRes.data) ? auditRes.data : []);
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setError("Failed to load dashboard data. Please refresh.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitial();
+
+    // Set up polling
+    const intervalId = setInterval(() => {
+      loadData();
+    }, pollingInterval);
+
+    intervalRef.current = intervalId;
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+
+
   const totalTasks = project.reduce((sum, p) => sum + (p.task_count || 0), 0);
   
-  // Calculate due today from project data
   const dueToday = project.reduce((sum, p) => {
     return sum + (p.tasks?.filter(t => 
       new Date(t.due_date).toDateString() === new Date().toDateString()
     )?.length || 0);
   }, 0);
 
-  // Error state
   if (error) {
     return (
       <WorkspaceLayout>
@@ -101,7 +139,7 @@ export default function DashBoardPage() {
             path="/projects" 
           />
           <StatCard title="Tasks" value={totalTasks} icon={CheckCircle} />
-          <StatCard title="Team Members" value={member.length} icon={Users} />
+          <StatCard title="Team Members" value={member.length} icon={Users} navigate={navigate} path="/members"/>
           <StatCard title="Due Today" value={dueToday} icon={Clock} />
         </div>
 
@@ -126,7 +164,6 @@ export default function DashBoardPage() {
             ) : (
               <ul className="space-y-3 max-h-80 overflow-y-auto">
                 {(() => {
-                  
                   const recentTasks = project
                     .flatMap((proj, projIndex) => 
                       (proj.recent_tasks || proj.tasks || [])
@@ -173,71 +210,61 @@ export default function DashBoardPage() {
               </div>
             ) : (
               <ul className="space-y-3 text-sm max-h-80 overflow-y-auto">
-                {auditlog.slice(0, 8).map((a) => {
-                  const now = new Date();
-                  const logDateObj = new Date(a.created_at);
-                  
-                  // Safety check for invalid dates
-                  if (isNaN(logDateObj.getTime())) {
-                    console.warn("Invalid date detected in log:", a.created_at);
-                    return null; // Skip this item
-                  }
-                  
-                  // Calculate date strings for comparison
-                  const logDateStr = new Date(logDateObj).toISOString().split('T')[0];
-                  const todayStr = new Date().toISOString().split('T')[0];
-                  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
-                  let dateDisplay = "";
-
-                  // Logic: Today (Relative), Yesterday, or Old Date
-                  if (logDateStr === todayStr) {
-                    // Calculate relative time for "Today"
-                    const nowMs = Date.now();
-                    const thenMs = logDateObj.getTime();
-                    const diffMs = nowMs - thenMs;
-
-                    if (diffMs < 0) {
-                      // This shouldn't happen if it's "today", but safety first
-                      return null; 
+                {auditlog
+                  .slice(0, 8)
+                  .filter((a) => {
+                    const d = new Date(a.created_at);
+                    if (isNaN(d.getTime())) {
+                      console.warn("Invalid date in audit log:", a.created_at);
+                      return false;
                     }
+                    return Date.now() - d.getTime() >= 0;
+                  })
+                  .map((a) => {
+                    const logDateObj = new Date(a.created_at);
+                    const logDateStr = logDateObj.toISOString().split('T')[0];
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
-                    const seconds = Math.floor(diffMs / 1000);
-                    const minutes = Math.floor(diffMs / 60000);
-                    const hours = Math.floor(diffMs / 3600000);
+                    let dateDisplay = "";
 
-                    if (seconds < 60) {
-                      dateDisplay = "Just now";
-                    } else if (minutes < 60) {
-                      dateDisplay = `${Math.floor(diffMs / 60000)} mins ago`;
-                    } else if (hours < 24) {
-                      dateDisplay = `${Math.floor(diffMs / 3600000)} hours ago`;
+                    if (logDateStr === todayStr) {
+                      const diffMs = Date.now() - logDateObj.getTime();
+                      const seconds = Math.floor(diffMs / 1000);
+                      const minutes = Math.floor(diffMs / 60000);
+                      const hours = Math.floor(diffMs / 3600000);
+
+                      if (seconds < 60) {
+                        dateDisplay = "Just now";
+                      } else if (minutes < 60) {
+                        dateDisplay = `${minutes} mins ago`;
+                      } else if (hours < 24) {
+                        dateDisplay = `${hours} hours ago`;
+                      } else {
+                        dateDisplay = logDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                      }
+                    } else if (logDateStr === yesterdayStr) {
+                      dateDisplay = "Yesterday";
                     } else {
-                      // Fallback to formatted date if it's a very old "today" (unlikely)
-                      dateDisplay = logDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                      dateDisplay = logDateObj.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      });
                     }
-                  } else if (logDateStr === yesterdayStr) {
-                    dateDisplay = "Yesterday";
-                  } else {
-                    // Older dates
-                    dateDisplay = new Date(a.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    });
-                  }
 
-                  return (
-                    <li key={a.id} className="flex items-center justify-between px-2 py-2 text-gray-600 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <span className="truncate">
-                        {a.action} by {a.user_display || a.user_name || a.user_email || "System"}
-                      </span>
-                      <span className="text-xs text-gray-400 whitespace-nowrap">
-                        {dateDisplay}
-                      </span>
-                    </li>
-                  );
-                })}
+                    return (
+                      <li key={a.id ?? a.created_at} className="flex items-center justify-between px-2 py-2 text-gray-600 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        <span className="truncate">
+                          {a.action} by {" "}
+                          <span className="capitalize font-medium">{(currentEmail === a.user_email) ? "You" : a.user_display}</span>
+                        </span>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                          {dateDisplay}
+                        </span>
+                      </li>
+                    );
+                  })}
               </ul>
             )}
           </div>
@@ -247,7 +274,7 @@ export default function DashBoardPage() {
   );
 }
 
-/* Reusable StatCard - Fixed navigation */
+/* Reusable StatCard */
 function StatCard({ title, value, icon: Icon, navigate, path }) {
   const handleClick = () => {
     if (path && navigate) {

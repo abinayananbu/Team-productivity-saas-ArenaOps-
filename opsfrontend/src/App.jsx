@@ -12,6 +12,7 @@ import ChatPage from "./pages/ChatPage";
 import ProfilePage from "./pages/Profile";
 import ProjectsPage from "./pages/ProjectsPage";
 import IntroductionPage from "./pages/Introduction";
+import AllMembers from "./pages/Members";
 
 function App() {
   return (
@@ -76,6 +77,14 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/members"
+          element={
+            <PrivateRoute>
+              <AllMembers/>
+            </PrivateRoute>
+          }
+          />
       </Routes>
       
      <ToastContainer

@@ -8,10 +8,22 @@ User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
+    # Read: returns full absolute URL
+    avatar_url = serializers.SerializerMethodField()
+
+    # Write: accepts the uploaded file
+    avatar = serializers.ImageField(required=False, allow_null=True)
+
+    def get_avatar_url(self, obj):
+        request = self.context.get('request')
+        if obj.avatar and request:
+            return request.build_absolute_uri(obj.avatar.url)
+        return None
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'role', 'organization', 'avatar']
-        read_only_fields = ['role', 'organization']
+        fields = ['id', 'email', 'role', 'organization', 'avatar', 'avatar_url']
+        read_only_fields = ['email']
 
 
 class OrganizationSerializer(serializers.ModelSerializer):

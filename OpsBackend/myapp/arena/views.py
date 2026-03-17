@@ -4,9 +4,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError, AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from datetime import timedelta
 from django.conf import settings
@@ -39,13 +42,70 @@ class UserViewSet(viewsets.ModelViewSet):
             organization=self.request.user.organization,
             role='MEMBER'   # force role
         )
+
+    def partial_update(self, request, *args, **kwargs):
+        user = self.get_object()
+        new_role = request.data.get('role')
+
+        #  Guard against missing role field
+        if new_role:
+            new_role = new_role.upper()
+
+            if new_role == 'OWNER':
+                raise PermissionDenied("Cannot assign OWNER role.")
+            
+            if user.role ==  new_role :
+                raise PermissionDenied("You cannot assign the user to the same role.")
+
+            if request.user.role != 'OWNER':
+                raise PermissionDenied("Only OWNER can change roles.")
+
+            if request.user == user:
+                raise PermissionDenied("You cannot change your own role.")
+
+            # ✅ Normalize to uppercase before serializer saves it
+            request.data['role'] = new_role
+
+            create_activity_log(
+                user=request.user,
+                organization=request.user.organization,
+                action="🚀User role updated",
+                metadata={
+                    "target_user_id": user.id,
+                    "target_user_email": user.email,
+                    "new_role": new_role,
+                }
+            )
+
+        return super().partial_update(request, *args, **kwargs)
+    
     def destroy(self, request, *args, **kwargs):
         user = self.get_object()
 
         if user.role == 'OWNER':
-            raise PermissionDenied("OWNER account cannot be deleted")
+            raise PermissionDenied("OWNER cannot be removed.")    
+        
+        if user == request.user:
+            raise PermissionDenied("You cannot remove yourself.")
 
-        return super().destroy(request, *args, **kwargs)
+        #  Just remove from org, don't delete the user
+        user.organization = None
+        user.role = 'MEMBER'  # reset role
+        user.save()
+
+        create_activity_log(
+            user=request.user,
+            organization=request.user.organization,
+            action="⛔ User removed",
+            metadata={
+                "removed_user_id": user.id,
+                "removed_user_email": user.email,
+            }
+        )
+
+        return Response({"detail": "Member removed from organization."}, status=status.HTTP_200_OK)
+    
+    
     
 ACCESS_COOKIE = "access_token"
 REFRESH_COOKIE = "refresh_token"
@@ -55,6 +115,7 @@ COOKIE_SETTINGS = {
     "secure": False,
     "samesite": "Lax",
     "path": "/",
+    "max_age": 60 * 60 * 24 * 7, 
 }
 
 class SignupView(APIView):
@@ -99,30 +160,45 @@ class LoginView(APIView):
 
 
 class CookieTokenRefreshView(APIView):
-    permission_classes = []  
+    permission_classes = []
 
     def post(self, request):
         refresh_token = request.COOKIES.get(REFRESH_COOKIE)
+        print("REFRESH TOKEN FROM COOKIE:", refresh_token) 
+        
         if not refresh_token:
             raise AuthenticationFailed("No refresh token")
+
+        serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
         try:
-            token = RefreshToken(refresh_token)
-            response = Response({"message": "Token refreshed"})
-            response.set_cookie(key=ACCESS_COOKIE, value=str(token.access_token), **COOKIE_SETTINGS)
-            return response
-        except Exception:
-            raise AuthenticationFailed("Invalid refresh token")
+            serializer.is_valid(raise_exception=True)
+        except TokenError as e:
+            print("TOKEN ERROR:", e)  
+            raise InvalidToken(e.args[0])
+        ...
 
 
 class LogoutView(APIView):
     permission_classes = [] 
 
     def post(self, request):
+        user = request.user
         try:
             token = RefreshToken(request.COOKIES.get(REFRESH_COOKIE))
             token.blacklist()
         except Exception:
             pass
+
+        create_activity_log(
+                user=request.user,
+                organization=request.user.organization,
+                action="☠️ Logged out",
+                metadata={
+                    "target_user_id": user.id,
+                    "target_user_email": user.email,
+                }
+            )
+        
         response = Response({"message": "Logged out"}, status=status.HTTP_200_OK)
         response.delete_cookie(ACCESS_COOKIE, path="/")
         response.delete_cookie(REFRESH_COOKIE, path="/")
@@ -261,6 +337,35 @@ class MeView(APIView):
                 "name": user.organization.name if user.organization else None,
             }
         })
+
+class MeAvatarChangeView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        user = request.user
+        serializer = UserSerializer(
+            user,
+            data=request.data,
+            partial=True,
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Avatar uploaded successfully",
+                "avatar": serializer.data.get("avatar_url")
+            }, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request):
+        user = request.user
+        if user.avatar:
+            user.avatar.delete(save=False)
+            user.avatar = None
+            user.save()
+        return Response({"message": "Avatar removed successfully"}, status=status.HTTP_200_OK)
     
 # Create Projects
 class ProjectView(APIView):
@@ -371,7 +476,7 @@ class TaskCreateView(APIView):
         create_activity_log(
             user=request.user,
             organization=request.user.organization,
-            action="📁 New task created",
+            action="🖇️ New task created",
             metadata={
                 "task_name": task.title,
                 "task_id": task.id

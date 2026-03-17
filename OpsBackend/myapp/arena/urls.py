@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (UserViewSet, SignupView, LoginView, InviteUserView, AcceptInviteView, GoogleLoginView, MeView, ProjectView, ShowProject, ProjectDetailView, TaskListView, 
                     TaskCreateView, TaskDetailView, DeleteTaskView , UpdateTaskView, ProjectDeleteView, ChannelMessagesView, CookieTokenRefreshView, LogoutView, ActivityLogView, 
-                    DocumentView, DocumentListView, DocumentDetailView, DocumentDeleteView)
+                    DocumentView, DocumentListView, DocumentDetailView, DocumentDeleteView,MeAvatarChangeView)
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
 
@@ -20,6 +20,7 @@ urlpatterns = [
     path("auth/google/", GoogleLoginView.as_view()),
 
     path("auth/me/", MeView.as_view()),
+    path("auth/me/avatar/", MeAvatarChangeView.as_view()),
 
     ##Projects
     path('auth/project/', ProjectView.as_view()),

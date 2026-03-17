@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8000/api";
+const BASE_URL = "/api";
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -13,6 +13,9 @@ export const api = axios.create({
 
 let isRefreshing = false;
 let failedQueue = [];
+let hasSession = false; //  track if user has ever logged in
+
+export const setHasSession = (val) => { hasSession = val; }; //  export setter
 
 const processQueue = (error = null) => {
   failedQueue.forEach((prom) => {
@@ -27,17 +30,24 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (originalRequest.url?.includes("auth/refresh/") ||
-        originalRequest.url?.includes("auth/login/")) {
-        return Promise.reject(error);
+    if (
+      originalRequest.url?.includes("auth/refresh/") ||
+      originalRequest.url?.includes("auth/login/")
+    ) {
+      return Promise.reject(error);
+    }
+
+    //  Don't attempt refresh if there's no session
+    if (!hasSession) {
+      return Promise.reject(error);
     }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then(() => api(originalRequest))
+        })
+          .then(() => api(originalRequest))
           .catch((err) => Promise.reject(err));
       }
 
@@ -46,15 +56,13 @@ api.interceptors.response.use(
 
       try {
         await api.post("auth/refresh/", {});
-
         isRefreshing = false;
         processQueue();
         return api(originalRequest);
-
       } catch (err) {
         isRefreshing = false;
+        hasSession = false; //  clear session on failed refresh
         processQueue(err);
-        console.assertlog(err);
         window.location.href = "/login";
         return Promise.reject(err);
       }
@@ -79,29 +87,40 @@ export const loginApi = (data) =>
   });
 
 export const logoutApi = () => api.post("auth/logout/");
+
+// USER
 export const profileApi = () => api.get("auth/me/");
+export const uploadAvatarApi = (data) =>
+  api.post("auth/me/avatar/", data, {
+    headers: {
+      "Content-Type": undefined,},
+  });
+export const removeAvatarApi = () => api.delete("auth/me/avatar/");
 
 // PROJECTS
 export const createProjectApi = (data) => api.post("auth/project/", data);
 export const showProjectApi = () => api.get("auth/projects/");
 export const getProjectByIdApi = (id) => api.get(`auth/projects/${id}/`);
-export const deleteProjectApi = (id) => api.delete(`auth/project/delete/${id}/`);
+export const deleteProjectApi = (id) =>
+  api.delete(`auth/project/delete/${id}/`);
 
 // TASKS
-export const getTasksApi = (projectId) => api.get(`auth/tasks/?project=${projectId}`);
+export const getTasksApi = (projectId) =>api.get(`auth/tasks/?project=${projectId}`);
 export const createTaskApi = (data) => api.post("auth/tasks/create/", data);
-export const getTaskByIdApi = (id) => api.get(`auth/tasks/details/${id}/`); 
+export const getTaskByIdApi = (id) => api.get(`auth/tasks/details/${id}/`);
 export const deleteTaskApi = (id) => api.delete(`auth/tasks/delete/${id}/`);
-export const updateTaskApi = (id, data) => api.put(`auth/tasks/update/${id}/`, data);
+export const updateTaskApi = (id, data) =>api.put(`auth/tasks/update/${id}/`, data);
 
-// Members
+// MEMBERS
 export const orgMembersApi = () => api.get("users/");
+export const updateRoleApi = (id, data) => api.patch(`users/${id}/`, data);
+export const removeMemberApi = (id) => api.delete(`users/${id}/`)
 
-//Activity log
-export const showAuditApi = () => api.get("auth/activity-logs/")
+// ACTIVITY LOG
+export const showAuditApi = () => api.get("auth/activity-logs/");
 
-//Document
-export const createDocsApi = (data) => api.post("auth/documents/create/", data);  
+// DOCUMENTS
+export const createDocsApi = (data) =>api.post("auth/documents/create/", data);
 export const showDocsApi = () => api.get("/auth/documents/");
-export const saveDocApi = (docId, data) => api.patch(`/auth/documents/${docId}/`, data);
+export const saveDocApi = (docId, data) =>api.patch(`/auth/documents/${docId}/`, data);
 export const deleteDocApi = (id) => api.delete(`auth/document/delete/${id}/`);

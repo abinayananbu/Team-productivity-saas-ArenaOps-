@@ -5,11 +5,13 @@ import {
   FileText,
   SquarePen,
   ChevronLeft,
+  Rocket,
   ChevronRight,
   MessagesSquare,
   Plus,
   Send,
   Ban,
+  Users,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {api} from "../services/api";
@@ -28,6 +30,7 @@ export default function Sidebar() {
     { name: "Home", icon: Home, path: "/dashboard" },
     { name: "Spaces", icon: Layers, path: "/spaces" },
     { name: "Projects", icon: SquarePen, path: "/projects" },
+    { name: "Members", icon: Users, path: "/members" },
     { name: "Docs", icon: FileText, path: "/docs" },
     { name: "Chats", icon: MessagesSquare, path: "/chats" },
   ];
@@ -68,7 +71,7 @@ export default function Sidebar() {
               {collapsed ? (
                 <ChevronRight size={18} />
               ) : (
-                <ChevronLeft size={18} />
+                <Rocket size={18} className=" transition-all animate-bounce text-gray-200" />
               )}
             </button>
           </div>

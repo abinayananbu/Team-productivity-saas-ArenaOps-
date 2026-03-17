@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loginApi } from "../services/api";
 import { GoogleLogin } from "@react-oauth/google";
 import { api } from "../services/api";
@@ -9,6 +9,7 @@ import { EyeOff, Eye } from "lucide-react";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
 
@@ -29,10 +30,12 @@ export default function LoginPage() {
       return;
     }
 
-    try {
+   try {
       await loginApi(form);
       toast.success("Welcome back! 🍾");
-      setTimeout(() => navigate("/dashboard"), 500);
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 2000);
     } catch (err) {
       const errorMessage =
         err?.response?.data?.message ||
